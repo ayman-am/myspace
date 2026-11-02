@@ -29,8 +29,8 @@ export const MAX_BATCH = 20;
 export const SIGNED_URL_TTL_SECONDS = 600;
 /** إعادة توقيع روابط الصور قبل انتهائها (8 دقائق) */
 export const SIGNED_URL_REFRESH_MS = 8 * 60 * 1000;
-/** قفل الجلسة تلقائيًا بعد هذه المدة من عدم النشاط */
-export const IDLE_LOGOUT_MS = 30 * 60 * 1000;
+/** قفل الجلسة تلقائيًا بعد هذه المدة من عدم النشاط (أسبوع كامل) */
+export const IDLE_LOGOUT_MS = 7 * 24 * 60 * 60 * 1000;
 /** أقصى طول للنصوص المحفوظة */
 export const MAX_TEXT_CHARS = 50_000;
 /** أقصى طول للعنوان */
