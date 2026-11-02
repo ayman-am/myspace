@@ -62,7 +62,8 @@ Takes about ten minutes, and everything here runs on free tiers.
 Full details, and the settings only you can switch on, in [SECURITY.md](SECURITY.md).
 
 - Every row is tied to `auth.uid()`, and RLS is on — you can't read or touch another user's data even with the public key.
-- The bucket is private. Every view and download goes through a signed URL that expires after an hour.
+- The bucket is private. Every view and download goes through a signed URL that expires after 10 minutes and renews itself while you browse.
+- Two-factor login is built in: open the shield icon, scan the QR with any TOTP app, and every new sign-in asks for a 6-digit code. `supabase/aal2.sql` is the optional step that makes the database itself refuse password-only sessions.
 - Storage paths are ASCII (`{userId}/{uuid}/{uuid}.{ext}`), while the original filename lives in the database. That detail exists because Arabic and spaced filenames get rejected by the storage API otherwise.
 - A database trigger (`enforce_single_user`) rejects any second account.
 - The frontend only ever holds the publishable anon key. No `service_role` key anywhere in the repo.
@@ -73,7 +74,7 @@ Full details, and the settings only you can switch on, in [SECURITY.md](SECURITY
 |---|---|---|
 | Max file size | 50 MB | `supabase/setup.sql` and `src/lib/supabase.ts` |
 | Files per batch | 20 | `src/lib/api.ts` |
-| Signed URL lifetime | 1 hour | `src/lib/api.ts` |
+| Signed URL lifetime | 10 minutes | `src/lib/supabase.ts` |
 
 ## Layout
 
@@ -81,7 +82,10 @@ Full details, and the settings only you can switch on, in [SECURITY.md](SECURITY
 src/App.tsx            session, state, uploads, realtime channel
 src/components/        auth screen, header, upload zone, cards, preview, text dialog
 src/lib/api.ts         upload / sign / download / delete, storage keys
+src/lib/mfa.ts         TOTP enroll / verify / remove
 supabase/setup.sql     table, RLS, bucket, realtime, single-user trigger
+supabase/hardening.sql constraints and storage-level file-type rules
+supabase/aal2.sql      optional: require the second factor at the database level
 .github/workflows/     deploy to Vercel on push
 ```
 
