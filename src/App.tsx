@@ -27,6 +27,9 @@ import PreviewModal from "./components/PreviewModal";
 import { OfflineBanner, Toasts, UploadsBar, type Toast } from "./components/Feedback";
 import { EmptyState, LoadError, LoadingSkeleton, RealtimeBadge } from "./components/States";
 import { SetupScreen, Splash } from "./components/Screens";
+import MfaGate from "./components/MfaGate";
+import SecurityDialog from "./components/SecurityDialog";
+import { getAssurance } from "./lib/mfa";
 
 /* ==================== الوضع الداكن ==================== */
 
@@ -81,6 +84,8 @@ function useIdleLogout(onLogout: () => void, timeoutMs: number) {
 export default function App() {
   const [init, setInit] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [aal, setAal] = useState<{ current: string | null; next: string | null } | null>(null);
+  const [aalChecked, setAalChecked] = useState(false);
   const { dark, toggle } = useTheme();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -88,6 +93,12 @@ export default function App() {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-3), { id, kind, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
+  }, []);
+
+  const checkAssurance = useCallback(async () => {
+    const level = await getAssurance();
+    setAal(level);
+    setAalChecked(true);
   }, []);
 
   useEffect(() => {
@@ -109,6 +120,16 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // فحص مستوى تأكيد الجلسة (هل يحتاج رمز التحقق؟)
+  useEffect(() => {
+    if (!session) {
+      setAal(null);
+      setAalChecked(false);
+      return;
+    }
+    void checkAssurance();
+  }, [session, checkAssurance]);
+
   const logout = useCallback(async () => {
     await supabase?.auth.signOut();
   }, []);
@@ -127,6 +148,18 @@ export default function App() {
       <Toasts toasts={toasts} />
     </>
   );
+
+  // انتظار فحص مستوى التأمين قبل عرض المحتوى
+  if (!aalChecked) return <Splash />;
+
+  // مصادقة ثنائية مفعّلة وكلمة المرور وحدها لا تكفي
+  if (aal?.next === "aal2" && aal.current !== "aal2")
+    return (
+      <>
+        <MfaGate onDone={checkAssurance} onLogout={logout} />
+        <Toasts toasts={toasts} />
+      </>
+    );
 
   return (
     <>
@@ -176,6 +209,7 @@ function Workspace({
 
   const pickerRef = useRef<HTMLInputElement>(null);
   const [textDialogOpen, setTextDialogOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
 
   // مراجع حديثة تُستخدم داخل المؤقتات دون إعادة اشتراك
   const urlsRef = useRef<Record<string, string>>({});
@@ -470,6 +504,7 @@ function Workspace({
       <Header
         onOpenPicker={openPicker}
         onOpenText={() => setTextDialogOpen(true)}
+        onOpenSecurity={() => setSecurityOpen(true)}
         onLogout={onLogout}
         dark={dark}
         onToggleDark={onToggleDark}
@@ -528,6 +563,7 @@ function Workspace({
       </footer>
 
       <TextDialog open={textDialogOpen} onClose={() => setTextDialogOpen(false)} onSave={saveText} />
+      <SecurityDialog open={securityOpen} onClose={() => setSecurityOpen(false)} onNotify={onNotify} />
       <PreviewModal
         item={preview}
         url={preview && preview.type === "image" ? urls[preview.id] : undefined}

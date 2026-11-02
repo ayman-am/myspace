@@ -1,8 +1,9 @@
-import { LogOut, Moon, Plus, Sun, Type } from "lucide-react";
+import { LogOut, Moon, Plus, ShieldCheck, Sun, Type } from "lucide-react";
 
 interface HeaderProps {
   onOpenPicker: () => void;
   onOpenText: () => void;
+  onOpenSecurity: () => void;
   onLogout: () => void;
   dark: boolean;
   onToggleDark: () => void;
@@ -12,6 +13,7 @@ interface HeaderProps {
 export default function Header({
   onOpenPicker,
   onOpenText,
+  onOpenSecurity,
   onLogout,
   dark,
   onToggleDark,
@@ -55,6 +57,13 @@ export default function Header({
           className="hidden sm:grid place-items-center size-9 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         >
           {dark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
+        </button>
+        <button
+          onClick={onOpenSecurity}
+          title="الأمان والتحقق بخطوتين"
+          className="grid place-items-center size-8 sm:size-9 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
+        >
+          <ShieldCheck className="size-4.5" />
         </button>
         <button
           onClick={onLogout}
