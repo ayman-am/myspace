@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    "IBM Plex Sans Arabic", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --color-accent: oklch(0.51 0.23 277);
+  --color-accent-strong: oklch(0.44 0.21 277);
+  --color-accent-soft: oklch(0.95 0.03 277);
+  --color-surface: oklch(0.985 0.002 260);
+  --color-page: oklch(0.978 0.003 260);
+}
+
+@theme dark {
+  --color-accent: oklch(0.68 0.19 277);
+  --color-accent-strong: oklch(0.6 0.18 277);
+  --color-accent-soft: oklch(0.28 0.05 277);
+  --color-surface: oklch(0.21 0.012 260);
+  --color-page: oklch(0.155 0.012 260);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-page);
+  color: var(--tw-color-neutral-800, #26272b);
+}
+
+html.dark body {
+  color: var(--tw-color-neutral-200, #e4e4e7);
+}
+
+/* شريط تمرير هادئ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.18) transparent;
+}
+html.dark * {
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+/* حركة ظهور البطاقات */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.28s ease-out both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-toast {
+  animation: toast-in 0.22s ease-out both;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-overlay {
+  animation: overlay-in 0.18s ease-out both;
+}
