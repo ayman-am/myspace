@@ -53,7 +53,7 @@
 
 **النشر:** استخدم زر Vercel أدناه، أو ادفع الكود إلى GitHub ودع السير الجاهز يبني المشروع وينشره.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/aymanjrmh/myspace&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ayman-am/myspace&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY)
 
 > النسخة الحيّة على https://myspace-coral.vercel.app هي مساحة صاحب المشروع الشخصية، والتسجيل فيها مغلق عن قصد. انشر نسختك لتجربته.
 

@@ -53,7 +53,7 @@ Takes about ten minutes, and everything here runs on free tiers.
 
 **Deploying:** click the button below, or push to GitHub and let the included workflow build it.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/aymanjrmh/myspace&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ayman-am/myspace&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY)
 
 > The live copy at https://myspace-coral.vercel.app is the maintainer's own space. Sign-ups are closed there by design, so deploy your own to try it.
 
