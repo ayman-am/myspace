@@ -59,6 +59,8 @@ Takes about ten minutes, and everything here runs on free tiers.
 
 ## Security, in plain terms
 
+Full details, and the settings only you can switch on, in [SECURITY.md](SECURITY.md).
+
 - Every row is tied to `auth.uid()`, and RLS is on — you can't read or touch another user's data even with the public key.
 - The bucket is private. Every view and download goes through a signed URL that expires after an hour.
 - Storage paths are ASCII (`{userId}/{uuid}/{uuid}.{ext}`), while the original filename lives in the database. That detail exists because Arabic and spaced filenames get rejected by the storage API otherwise.

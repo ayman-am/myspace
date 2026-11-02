@@ -1,9 +1,45 @@
 import type { ItemKind } from "../types";
 
-/** تصاريح ملفات الصور المعروفة أولًا */
+/** تصاريح ملفات الصور المعروفة أولًا (بدون SVG لأنه يمكن أن يحمل أكوادًا) */
 const IMAGE_EXTS = new Set([
-  "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif", "bmp", "svg",
+  "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif", "bmp",
 ]);
+
+/** امتدادات ممنوعة: يمكن أن تُنفَّذ داخل المتصفح عند فتح الرابط */
+const BLOCKED_EXTS = new Set([
+  "html", "htm", "xhtml", "shtml", "svg", "svgz",
+  "js", "mjs", "cjs", "jsx", "php", "phtml",
+]);
+
+/** أنواع MIME ممنوعة لنفس السبب */
+const BLOCKED_MIMES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "application/javascript",
+  "text/javascript",
+  "application/x-javascript",
+  "application/ecmascript",
+  "text/ecmascript",
+]);
+
+/** هل الملف من نوع قابل لتنفيذ أكواد داخل المتصفح؟ (يُرفض قبل الرفع) */
+export function isDangerousFile(name: string, mime?: string | null): boolean {
+  if (BLOCKED_EXTS.has(extOf(name))) return true;
+  const m = (mime || "").toLowerCase();
+  return m ? BLOCKED_MIMES.has(m) : false;
+}
+
+/** اسم ملف آمن للعرض والتنزيل: بلا رموز تحكم أو محارف تكسر الترويسات */
+export function safeFilename(name: string, fallback = "ملف"): string {
+  const cleaned = (name || "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f"\\/:*?<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return cleaned || fallback;
+}
 
 /** امتداد الملف بأحرف صغيرة */
 export function extOf(name: string): string {

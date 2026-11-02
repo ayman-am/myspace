@@ -1,17 +1,24 @@
 import type { SpaceItem } from "../types";
-import { BUCKET, MAX_BATCH, MAX_FILE_BYTES, supabase } from "./supabase";
-import { detectKind, extOf } from "./utils";
+import {
+  BUCKET,
+  MAX_BATCH,
+  MAX_FILE_BYTES,
+  SIGNED_URL_TTL_SECONDS,
+  supabase,
+} from "./supabase";
+import { detectKind, extOf, isDangerousFile, safeFilename } from "./utils";
 
-/** رسالة عربية مختصرة لخطأ شائع */
+/** رسالة عربية مختصرة لخطأ شائع — بدون كشف تفاصيل داخلية */
 export function friendlyError(err: unknown, prefix: string): string {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   const m = msg.toLowerCase();
   if (m.includes("signature") || m.includes("jwt")) return prefix + ": انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.";
   if (m.includes("payload too large") || m.includes("size")) return prefix + ": الملف أكبر من الحد المسموح (50 ميغابايت).";
   if (m.includes("invalid key")) return prefix + ": اسم الملف يحتوي رموزًا غير مدعومة في التخزين.";
+  if (m.includes("mime")) return prefix + ": نوع هذا الملف غير مسموح لأسباب أمنية.";
   if (m.includes("network") || m.includes("fetch")) return prefix + ": تحقق من اتصالك بالإنترنت.";
   if (m.includes("row-level security")) return prefix + ": لا تملك صلاحية القيام بهذا الإجراء.";
-  return prefix + ": " + (msg || "خطأ غير معروف");
+  return prefix + ": حدث خطأ غير متوقع، حاول مرة أخرى.";
 }
 
 /** مفتاح تخزين آمن (ASCII) — يعتمد على UUID والامتداد فقط، والاسم الأصلي يبقى في قاعدة البيانات */
@@ -52,7 +59,7 @@ export async function uploadOne(
     id,
     user_id: userId,
     type: detectKind(file.name, file.type),
-    title: file.name || "ملف بدون اسم",
+    title: safeFilename(file.name, "ملف"),
     content: null,
     mime_type: file.type || null,
     size: file.size,
@@ -77,6 +84,11 @@ export function validateBatch(files: File[]): void {
   if (files.length === 0) throw new Error("لم يتم اختيار أي ملف.");
   if (files.length > MAX_BATCH)
     throw new Error(`يمكنك رفع ${MAX_BATCH} ملفًا كحد أقصى في كل مرة.`);
+  const dangerous = files.find((f) => isDangerousFile(f.name, f.type));
+  if (dangerous)
+    throw new Error(
+      `الملف «${dangerous.name}» من نوع يُنفّذ أكوادًا داخل المتصفح، ولذلك مرفوض لأمانك.`,
+    );
   const tooBig = files.find((f) => f.size > MAX_FILE_BYTES);
   if (tooBig) throw new Error(`الملف «${tooBig.name}» أكبر من 50 ميغابايت.`);
 }
@@ -86,11 +98,14 @@ export async function getSignedUrl(
   path: string,
   opts?: { download?: boolean | string },
 ): Promise<string | null> {
+  const download =
+    typeof opts?.download === "string"
+      ? safeFilename(opts.download, "ملف")
+      : (opts?.download ?? false);
+
   const { data, error } = await supabase!.storage
     .from(BUCKET)
-    .createSignedUrl(path, 3600, {
-      download: opts?.download ?? false,
-    });
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, { download });
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
@@ -113,13 +128,13 @@ export async function deleteItem(item: SpaceItem): Promise<void> {
 /** تنزيل الملف في المتصفح عبر رابط موقّع */
 export async function downloadItem(item: SpaceItem): Promise<void> {
   if (!item.storage_path) return;
-  const url = await getSignedUrl(item.storage_path, {
-    download: item.title || "ملف",
-  });
+  const name = safeFilename(item.title, "ملف");
+  const url = await getSignedUrl(item.storage_path, { download: name });
   if (!url) throw new Error("تعذر إنشاء رابط التنزيل.");
   const a = document.createElement("a");
   a.href = url;
-  a.download = item.title || "ملف";
+  a.download = name;
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   a.remove();

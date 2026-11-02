@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
+import { MAX_TEXT_CHARS, MAX_TITLE_CHARS } from "../lib/supabase";
 
 interface TextDialogProps {
   open: boolean;
@@ -61,6 +62,7 @@ export default function TextDialog({ open, onClose, onSave }: TextDialogProps) {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            maxLength={MAX_TITLE_CHARS}
             placeholder="العنوان (اختياري)"
             className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3.5 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 placeholder:text-neutral-400"
           />
@@ -68,10 +70,16 @@ export default function TextDialog({ open, onClose, onSave }: TextDialogProps) {
             ref={contentRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            maxLength={MAX_TEXT_CHARS}
             placeholder="اكتب نصك هنا…"
             rows={8}
             className="w-full resize-y rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3.5 py-2.5 text-sm leading-relaxed outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 placeholder:text-neutral-400 min-h-36"
           />
+          {content.length > MAX_TEXT_CHARS * 0.9 && (
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-left" dir="ltr">
+              {content.length.toLocaleString("en")} / {MAX_TEXT_CHARS.toLocaleString("en")}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/70 dark:border-neutral-800">

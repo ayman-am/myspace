@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { isConfigured, supabase } from "./lib/supabase";
+import {
+  IDLE_LOGOUT_MS,
+  isConfigured,
+  MAX_TEXT_CHARS,
+  MAX_TITLE_CHARS,
+  SIGNED_URL_REFRESH_MS,
+  supabase,
+} from "./lib/supabase";
+import { safeFilename } from "./lib/utils";
 import {
   deleteItem,
   downloadItem,
@@ -35,6 +43,37 @@ function useTheme() {
     if (meta) meta.setAttribute("content", dark ? "#0b0c10" : "#f7f7f8");
   }, [dark]);
   return { dark, toggle: () => setDark((d) => !d) };
+}
+
+/* ==================== قفل الجلسة عند الخمول ==================== */
+
+/** يسجّل الخروج تلقائيًا بعد مدة من عدم النشاط (جهاز منسي مفتوحًا) */
+function useIdleLogout(onLogout: () => void, timeoutMs: number) {
+  useEffect(() => {
+    let timer = 0;
+    const reset = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(onLogout, timeoutMs);
+    };
+    const events: (keyof WindowEventMap)[] = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+    ];
+    const onVisible = () => {
+      if (!document.hidden) reset();
+    };
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    document.addEventListener("visibilitychange", onVisible);
+    reset();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [onLogout, timeoutMs]);
 }
 
 /* ==================== الجذر: جلسة المستخدم ==================== */
@@ -74,6 +113,12 @@ export default function App() {
     await supabase?.auth.signOut();
   }, []);
 
+  // إنهاء الجلسة على كل الأجهزة (مفيد إذا فُقد الجهاز)
+  const logoutAll = useCallback(async () => {
+    if (!window.confirm("تسجيل الخروج من كل الأجهزة، بما فيها هذا الجهاز؟")) return;
+    await supabase?.auth.signOut({ scope: "global" });
+  }, []);
+
   if (init) return <Splash />;
   if (!supabase || !isConfigured) return <SetupScreen />;
   if (!session) return (
@@ -91,6 +136,7 @@ export default function App() {
         onToggleDark={toggle}
         onNotify={notify}
         onLogout={logout}
+        onLogoutAll={logoutAll}
       />
       <Toasts toasts={toasts} />
     </>
@@ -105,9 +151,17 @@ interface WorkspaceProps {
   onToggleDark: () => void;
   onNotify: (kind: Toast["kind"], text: string) => void;
   onLogout: () => void;
+  onLogoutAll: () => void;
 }
 
-function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: WorkspaceProps) {
+function Workspace({
+  session,
+  dark,
+  onToggleDark,
+  onNotify,
+  onLogout,
+  onLogoutAll,
+}: WorkspaceProps) {
   const uid = session.user.id;
 
   const [items, setItems] = useState<SpaceItem[]>([]);
@@ -123,9 +177,24 @@ function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: Workspac
   const pickerRef = useRef<HTMLInputElement>(null);
   const [textDialogOpen, setTextDialogOpen] = useState(false);
 
-  /* ---------- جلب روابط توقيع مؤقتة لعرض الملفات ---------- */
-  const refreshUrls = useCallback(async (list: SpaceItem[]) => {
-    const media = list.filter((i) => i.storage_path && !urls[i.id]);
+  // مراجع حديثة تُستخدم داخل المؤقتات دون إعادة اشتراك
+  const urlsRef = useRef<Record<string, string>>({});
+  const itemsRef = useRef<SpaceItem[]>([]);
+  useEffect(() => {
+    urlsRef.current = urls;
+  }, [urls]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // قفل تلقائي للجلسة عند ترك الجهاز مفتوحًا
+  useIdleLogout(onLogout, IDLE_LOGOUT_MS);
+
+  /* ---------- جلب روابط توقيع مؤقتة للصور فقط ---------- */
+  const refreshUrls = useCallback(async (list: SpaceItem[], force = false) => {
+    const media = list.filter(
+      (i) => i.type === "image" && i.storage_path && (force || !urlsRef.current[i.id]),
+    );
     if (media.length === 0) return;
     const entries = await Promise.all(
       media.map(async (i) => {
@@ -141,13 +210,21 @@ function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: Workspac
       for (const [id, u] of entries) if (u) next[id] = u;
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ---------- تجديد الروابط قبل انتهاء صلاحيتها ---------- */
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => void refreshUrls(itemsRef.current, true),
+      SIGNED_URL_REFRESH_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [refreshUrls]);
 
   /* ---------- إضافة/إزالة محلية مع منع التكرار (سجل واحد من الحقيقة) ---------- */
   const upsertLocal = useCallback((item: SpaceItem) => {
     setItems((prev) => (prev.some((x) => x.id === item.id) ? prev : [item, ...prev]));
-    if (item.storage_path) {
+    if (item.type === "image" && item.storage_path) {
       getSignedUrl(item.storage_path).then((u) => {
         if (u) setUrls((prev) => ({ ...prev, [item.id]: u }));
       });
@@ -304,14 +381,24 @@ function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: Workspac
   const saveText = useCallback(
     async (title: string, content: string): Promise<boolean> => {
       try {
-        const fallbackTitle = content.replace(/\s+/g, " ").trim().slice(0, 40);
+        const clean = content.replace(/\r\n/g, "\n").trim();
+        if (!clean) {
+          onNotify("error", "لا يمكن حفظ نص فارغ.");
+          return false;
+        }
+        if (clean.length > MAX_TEXT_CHARS) {
+          onNotify("error", `النص طويل جدًا (الحد ${MAX_TEXT_CHARS.toLocaleString("ar")} حرف).`);
+          return false;
+        }
+        const cleanTitle = safeFilename(title, "").slice(0, MAX_TITLE_CHARS);
+        const fallbackTitle = clean.replace(/\s+/g, " ").slice(0, 40);
         const { data, error } = await supabase!
           .from("myspace_items")
           .insert({
             user_id: uid,
             type: "text",
-            title: title || fallbackTitle || "نص",
-            content,
+            title: cleanTitle || fallbackTitle || "نص",
+            content: clean,
           })
           .select()
           .single();
@@ -355,7 +442,8 @@ function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: Workspac
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `${item.title || "نص"}.txt`;
+          a.download = `${safeFilename(item.title, "نص")}.txt`;
+          a.rel = "noopener";
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -429,8 +517,14 @@ function Workspace({ session, dark, onToggleDark, onNotify, onLogout }: Workspac
         </section>
       </main>
 
-      <footer className="py-5 text-center text-[11px] text-neutral-400 dark:text-neutral-600">
-        MySpace · الترتيب من الأحدث إلى الأقدم · سياسة RLS تحفظ خصوصية ملفاتك
+      <footer className="py-5 px-4 text-center text-[11px] text-neutral-400 dark:text-neutral-600 space-y-2">
+        <p>MySpace · الترتيب من الأحدث إلى الأقدم · سياسة RLS تحفظ خصوصية ملفاتك</p>
+        <button
+          onClick={onLogoutAll}
+          className="underline decoration-dotted underline-offset-4 hover:text-neutral-600 dark:hover:text-neutral-400 transition-colors"
+        >
+          تسجيل الخروج من كل الأجهزة
+        </button>
       </footer>
 
       <TextDialog open={textDialogOpen} onClose={() => setTextDialogOpen(false)} onSave={saveText} />

@@ -28,14 +28,25 @@ export default function AuthScreen({ onToast }: AuthScreenProps) {
     e.preventDefault();
     if (busy) return;
     setError(null);
-    if (!email.trim() || password.length < 6) {
-      setError("أدخل بريدًا صحيحًا وكلمة مرور من 6 أحرف على الأقل.");
+    const cleanEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("أدخل بريدًا إلكترونيًا صحيحًا.");
+      return;
+    }
+    if (!password) {
+      setError("أدخل كلمة المرور.");
+      return;
+    }
+    if (mode === "signup" && password.length < 10) {
+      setError(
+        "اختر كلمة مرور من 10 أحرف على الأقل — عبارة طويلة تتذكرها أسهل من رمز قصير.",
+      );
       return;
     }
     setBusy(true);
     const { error: err } = mode === "login"
-      ? await supabaseAuth.signIn(email.trim(), password)
-      : await supabaseAuth.signUp(email.trim(), password);
+      ? await supabaseAuth.signIn(cleanEmail, password)
+      : await supabaseAuth.signUp(cleanEmail, password);
     setBusy(false);
     if (err) {
       setError(mapAuthError(err.message));
@@ -99,7 +110,10 @@ export default function AuthScreen({ onToast }: AuthScreenProps) {
                 aria-label="كلمة المرور"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                maxLength={72}
+                minLength={mode === "signup" ? 10 : undefined}
+                spellCheck={false}
+                placeholder="••••••••••"
                 className="mt-1.5 w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 placeholder:text-neutral-400"
               />
             </label>
